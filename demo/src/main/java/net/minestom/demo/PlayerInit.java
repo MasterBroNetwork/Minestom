@@ -122,7 +122,8 @@ public class PlayerInit {
         InstanceManager instanceManager = MinecraftServer.getInstanceManager();
 
         InstanceContainer instanceContainer = instanceManager.createInstanceContainer(DimensionType.OVERWORLD);
-        instanceContainer.setGenerator(unit -> unit.modifier().fillHeight(0, 40, Block.STONE));
+        instanceContainer.setupLightManager(true, true);
+        instanceContainer.setChunkGenerator(chunkGeneratorDemo);
 
         if (false) {
             System.out.println("start");

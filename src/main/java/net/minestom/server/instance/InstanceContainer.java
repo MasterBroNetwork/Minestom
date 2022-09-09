@@ -13,8 +13,7 @@ import net.minestom.server.event.player.PlayerBlockBreakEvent;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockHandler;
 import net.minestom.server.instance.block.rule.BlockPlacementRule;
-import net.minestom.server.instance.generator.Generator;
-import net.minestom.server.instance.palette.Palette;
+import net.minestom.server.instance.light.InstanceLightManager;
 import net.minestom.server.network.packet.server.play.BlockChangePacket;
 import net.minestom.server.network.packet.server.play.BlockEntityDataPacket;
 import net.minestom.server.network.packet.server.play.EffectPacket;
@@ -207,6 +206,11 @@ public class InstanceContainer extends Instance {
     }
 
     @Override
+    protected void cacheChunk(@NotNull Chunk chunk) {
+        this.chunks.put(getChunkIndex(chunk), chunk);
+    }
+
+    @Override
     public @NotNull CompletableFuture<Chunk> loadChunk(int chunkX, int chunkZ) {
         return loadOrRetrieve(chunkX, chunkZ, () -> retrieveChunk(chunkX, chunkZ));
     }
@@ -225,6 +229,11 @@ public class InstanceContainer extends Instance {
         EventDispatcher.call(new InstanceChunkUnloadEvent(this, chunk));
         // Remove all entities in chunk
         getEntityTracker().chunkEntities(chunkX, chunkZ, EntityTracker.Target.ENTITIES).forEach(Entity::remove);
+        // Stop light engine tasks
+        final InstanceLightManager lightManager = getLightManager();
+        if (lightManager != null) {
+            lightManager.removeChunkTasks(chunk);
+        }
         // Clear cache
         this.chunks.remove(getChunkIndex(chunkX, chunkZ));
         chunk.unload();
@@ -236,8 +245,12 @@ public class InstanceContainer extends Instance {
     }
 
     @Override
-    public Chunk getChunk(int chunkX, int chunkZ) {
-        return chunks.get(getChunkIndex(chunkX, chunkZ));
+    public @Nullable Chunk getChunk(int chunkX, int chunkZ, @NotNull ChunkStatus status) {
+        final Chunk chunk = chunks.get(getChunkIndex(chunkX, chunkZ));
+        if (chunk == null || !chunk.getStatus().isOrAfter(status)) {
+            return null;
+        }
+        return chunk;
     }
 
     @Override
@@ -273,6 +286,7 @@ public class InstanceContainer extends Instance {
                 })
                 // cache the retrieved chunk
                 .thenAccept(chunk -> {
+                    chunk.setStatus(ChunkStatus.COMPLETE);
                     // TODO run in the instance thread?
                     cacheChunk(chunk);
                     EventDispatcher.call(new InstanceChunkLoadEvent(this, chunk));
@@ -354,9 +368,9 @@ public class InstanceContainer extends Instance {
             });
             return resultFuture;
         } else {
-            // No chunk generator, execute the callback with the empty chunk
-            processFork(chunk);
-            return CompletableFuture.completedFuture(chunk);
+            // No chunk generator, generate light and execute the callback with the empty chunk
+            chunk.setStatus(ChunkStatus.LIGHTING);
+            return chunk.getLightData().lightChunk(false);
         }
     }
 
@@ -628,9 +642,4 @@ public class InstanceContainer extends Instance {
         return supplier.get();
     }
 
-    private void cacheChunk(@NotNull Chunk chunk) {
-        this.chunks.put(getChunkIndex(chunk), chunk);
-        var dispatcher = MinecraftServer.process().dispatcher();
-        dispatcher.createPartition(chunk);
-    }
 }
