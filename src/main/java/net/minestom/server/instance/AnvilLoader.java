@@ -439,7 +439,6 @@ public class AnvilLoader implements IChunkLoader {
                 }
             }
         };
-    }
 
     @Override
     public boolean supportsParallelLoading() {
