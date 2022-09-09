@@ -6,6 +6,11 @@ import it.unimi.dsi.fastutil.ints.IntIntImmutablePair;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockHandler;
+<<<<<<< HEAD
+=======
+import net.minestom.server.instance.light.ChunkLightData;
+import net.minestom.server.tag.Tag;
+>>>>>>> 3cbfe6be920cfd7a1fd681432658c5b3486bd51a
 import net.minestom.server.utils.NamespaceID;
 import net.minestom.server.utils.async.AsyncUtils;
 import net.minestom.server.world.biomes.Biome;
@@ -106,6 +111,7 @@ public class AnvilLoader implements IChunkLoader {
         final ChunkReader chunkReader = new ChunkReader(chunkData);
 
         Chunk chunk = new DynamicChunk(instance, chunkX, chunkZ);
+<<<<<<< HEAD
         synchronized (chunk) {
             var yRange = chunkReader.getYRange();
             if(yRange.getStart() < instance.getDimensionType().getMinY()) {
@@ -115,6 +121,46 @@ public class AnvilLoader implements IChunkLoader {
                                 instance.getDimensionType().getName().asString(),
                                 instance.getDimensionType().getMinY()
                         ));
+=======
+        chunk.setStatus(ChunkStatus.READING);
+        if(fileChunk.getMinY() < instance.getDimensionType().getMinY()) {
+            throw new AnvilException(
+                    String.format("Trying to load chunk with minY = %d, but instance dimension type (%s) has a minY of %d",
+                            fileChunk.getMinY(),
+                            instance.getDimensionType().getName().asString(),
+                            instance.getDimensionType().getMinY()
+                            ));
+        }
+        if(fileChunk.getMaxY() > instance.getDimensionType().getMaxY()) {
+            throw new AnvilException(
+                    String.format("Trying to load chunk with maxY = %d, but instance dimension type (%s) has a maxY of %d",
+                            fileChunk.getMaxY(),
+                            instance.getDimensionType().getName().asString(),
+                            instance.getDimensionType().getMaxY()
+                    ));
+        }
+
+        // TODO: Parallelize block, block entities and biome loading
+
+        if (fileChunk.getGenerationStatus().compareTo(ChunkColumn.GenerationStatus.Biomes) > 0) {
+            HashMap<String, Biome> biomeCache = new HashMap<>();
+
+            for (ChunkSection section : fileChunk.getSections().values()) {
+                if (section.getEmpty()) continue;
+                for (int y = 0; y < Chunk.CHUNK_SECTION_SIZE; y++) {
+                    for (int z = 0; z < Chunk.CHUNK_SIZE_Z; z++) {
+                        for (int x = 0; x < Chunk.CHUNK_SIZE_X; x++) {
+                            int finalX = fileChunk.getX() * Chunk.CHUNK_SIZE_X + x;
+                            int finalZ = fileChunk.getZ() * Chunk.CHUNK_SIZE_Z + z;
+                            int finalY = section.getY() * Chunk.CHUNK_SECTION_SIZE + y;
+                            String biomeName = section.getBiome(x, y, z);
+                            Biome biome = biomeCache.computeIfAbsent(biomeName, n ->
+                                    Objects.requireNonNullElse(MinecraftServer.getBiomeManager().getByName(NamespaceID.from(n)), BIOME));
+                            chunk.setBiome(finalX, finalY, finalZ, biome);
+                        }
+                    }
+                }
+>>>>>>> 3cbfe6be920cfd7a1fd681432658c5b3486bd51a
             }
             if(yRange.getEndInclusive() > instance.getDimensionType().getMaxY()) {
                 throw new AnvilException(
@@ -132,6 +178,7 @@ public class AnvilLoader implements IChunkLoader {
             // Block entities
             loadBlockEntities(chunk, chunkReader);
         }
+<<<<<<< HEAD
         synchronized (perRegionLoadedChunks) {
             int regionX = CoordinatesKt.chunkToRegion(chunkX);
             int regionZ = CoordinatesKt.chunkToRegion(chunkZ);
@@ -139,6 +186,21 @@ public class AnvilLoader implements IChunkLoader {
             chunks.add(new IntIntImmutablePair(chunkX, chunkZ));
         };
         return CompletableFuture.completedFuture(chunk);
+=======
+        // Blocks
+        loadBlocks(chunk, fileChunk);
+        loadTileEntities(chunk, fileChunk);
+        // Lights
+        final ChunkLightData lightData = chunk.getLightData();
+        for (int sectionY = chunk.getMinSection(); sectionY <= chunk.getMaxSection(); sectionY++) {
+            final ChunkSection chunkSection = fileChunk.getSection((byte) sectionY);
+            lightData.setSkyLight(sectionY, chunkSection.getSkyLights());
+            lightData.setBlockLight(sectionY, chunkSection.getBlockLights());
+        }
+        mcaFile.forget(fileChunk);
+        chunk.setStatus(ChunkStatus.LIGHTING);
+        return lightData.lightChunk(true);
+>>>>>>> 3cbfe6be920cfd7a1fd681432658c5b3486bd51a
     }
 
     private @Nullable RegionFile getMCAFile(Instance instance, int chunkX, int chunkZ) {
@@ -360,9 +422,24 @@ public class AnvilLoader implements IChunkLoader {
         return AsyncUtils.VOID_FUTURE;
     }
 
+<<<<<<< HEAD
     private BlockState getBlockState(final Block block) {
         return blockStateId2ObjectCacheTLS.get().computeIfAbsent(block.stateId(), _unused -> new BlockState(block.name(), block.properties()));
     }
+=======
+    private void save(Chunk chunk, ChunkColumn chunkColumn) {
+        chunkColumn.changeVersion(SupportedVersion.Companion.getLatest());
+        chunkColumn.setYRange(chunk.getMinSection() << 4, chunk.getMaxSection() << 4);
+        List<NBTCompound> tileEntities = new ArrayList<>();
+        chunkColumn.setGenerationStatus(ChunkColumn.GenerationStatus.Full);
+        for (int x = 0; x < Chunk.CHUNK_SIZE_X; x++) {
+            for (int z = 0; z < Chunk.CHUNK_SIZE_Z; z++) {
+                for (int y = chunkColumn.getMinY(); y < chunkColumn.getMaxY(); y++) {
+                    final Block block = chunk.getBlock(x, y, z);
+                    // Block
+                    chunkColumn.setBlockState(x, y, z, new BlockState(block.name(), block.properties()));
+                    chunkColumn.setBiome(x, y, z, chunk.getBiome(x, y, z).name().asString());
+>>>>>>> 3cbfe6be920cfd7a1fd681432658c5b3486bd51a
 
     private void save(Chunk chunk, ChunkWriter chunkWriter) {
         final int minY = chunk.getMinSection()*Chunk.CHUNK_SECTION_SIZE;
