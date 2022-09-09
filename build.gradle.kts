@@ -84,3 +84,9 @@ dependencies {
     api("io.github.jglrxavpok.hephaistos:common:${libs.versions.hephaistos.get()}")
     api("io.github.jglrxavpok.hephaistos:gson:${libs.versions.hephaistos.get()}")
 }
+
+var signingEnabled by extra(false)
+
+tasks.withType<Sign>().configureEach {
+    onlyIf { project.extra["signingEnabled"] as Boolean }
+}
