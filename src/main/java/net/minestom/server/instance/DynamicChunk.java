@@ -9,8 +9,6 @@ import net.minestom.server.entity.Player;
 import net.minestom.server.entity.pathfinding.PFBlock;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockHandler;
-import net.minestom.server.instance.light.ChunkLightData;
-import net.minestom.server.instance.light.InstanceLightManager;
 import net.minestom.server.network.packet.server.CachedPacket;
 import net.minestom.server.network.packet.server.play.ChunkDataPacket;
 import net.minestom.server.network.packet.server.play.UpdateLightPacket;
@@ -54,7 +52,7 @@ public class DynamicChunk extends Chunk {
 
     public DynamicChunk(@NotNull Instance instance, int chunkX, int chunkZ) {
         super(instance, chunkX, chunkZ, true);
-        var sectionsTemp = new Section[maxSection - minSection + 1];
+        var sectionsTemp = new Section[maxSection - minSection];
         Arrays.setAll(sectionsTemp, value -> new Section());
         this.sections = List.of(sectionsTemp);
     }
@@ -82,11 +80,6 @@ public class DynamicChunk extends Chunk {
             this.entries.put(index, block);
         } else {
             this.entries.remove(index);
-        }
-        // Light
-        final InstanceLightManager lightManager = getInstance().getLightManager();
-        if (lightManager != null) {
-            lightManager.onBlockChange(this, x, y, z);
         }
         // Block tick
         if (handler != null && handler.isTickable()) {
@@ -119,18 +112,15 @@ public class DynamicChunk extends Chunk {
 
     @Override
     public void tick(long time) {
-        super.tick(time);
-        if (getStatus() == ChunkStatus.COMPLETE) {
-            if (tickableMap.isEmpty()) return;
-            tickableMap.int2ObjectEntrySet().fastForEach(entry -> {
-                final int index = entry.getIntKey();
-                final Block block = entry.getValue();
-                final BlockHandler handler = block.handler();
-                if (handler == null) return;
-                final Point blockPosition = ChunkUtils.getBlockPosition(index, chunkX, chunkZ);
-                handler.tick(new BlockHandler.Tick(block, instance, blockPosition));
-            });
-        }
+        if (tickableMap.isEmpty()) return;
+        tickableMap.int2ObjectEntrySet().fastForEach(entry -> {
+            final int index = entry.getIntKey();
+            final Block block = entry.getValue();
+            final BlockHandler handler = block.handler();
+            if (handler == null) return;
+            final Point blockPosition = ChunkUtils.getBlockPosition(index, chunkX, chunkZ);
+            handler.tick(new BlockHandler.Tick(block, instance, blockPosition));
+        });
     }
 
     @Override
@@ -182,8 +172,7 @@ public class DynamicChunk extends Chunk {
 
     @Override
     public @NotNull Chunk copy(@NotNull Instance instance, int chunkX, int chunkZ) {
-        final DynamicChunk dynamicChunk = new DynamicChunk(instance, chunkX, chunkZ);
-        dynamicChunk.setLightData(getLightData().copy(dynamicChunk));
+        DynamicChunk dynamicChunk = new DynamicChunk(instance, chunkX, chunkZ);
         dynamicChunk.sections = sections.stream().map(Section::clone).toList();
         dynamicChunk.entries.putAll(entries);
         return dynamicChunk;
@@ -191,7 +180,6 @@ public class DynamicChunk extends Chunk {
 
     @Override
     public void reset() {
-        getLightData().clear();
         for (Section section : sections) section.clear();
         this.entries.clear();
     }
@@ -238,24 +226,22 @@ public class DynamicChunk extends Chunk {
         List<byte[]> skyLights = new ArrayList<>();
         List<byte[]> blockLights = new ArrayList<>();
 
-        final InstanceLightManager lightManager = getInstance().getLightManager();
-        final boolean hasSkyLight = lightManager != null && lightManager.hasSkyLight();
-        final boolean hasBlockLight = lightManager != null && lightManager.hasBlockLight();
-        final ChunkLightData lightData = getLightData();
-        for (int sectionY = getMinSection(), sectionIndex = 0; sectionY <= getMaxSection(); ++sectionY, ++sectionIndex) {
-            byte[] light = lightData.getSkyLight(sectionIndex);
-            if (hasSkyLight && light != null && light.length != 0) {
-                skyLights.add(light);
-                skyMask.set(sectionIndex);
+        int index = 0;
+        for (Section section : sections) {
+            index++;
+            final byte[] skyLight = section.getSkyLight();
+            final byte[] blockLight = section.getBlockLight();
+            if (skyLight.length != 0) {
+                skyLights.add(skyLight);
+                skyMask.set(index);
             } else {
-                emptySkyMask.set(sectionIndex);
+                emptySkyMask.set(index);
             }
-            light = lightData.getBlockLight(sectionIndex);
-            if (hasBlockLight && light != null && light.length != 0) {
-                blockLights.add(light);
-                blockMask.set(sectionIndex);
+            if (blockLight.length != 0) {
+                blockLights.add(blockLight);
+                blockMask.set(index);
             } else {
-                emptyBlockMask.set(sectionIndex);
+                emptyBlockMask.set(index);
             }
         }
         return new LightData(true,

@@ -1,6 +1,5 @@
 package net.minestom.server.instance;
 
-import net.minestom.server.MinecraftServer;
 import net.minestom.server.coordinate.Point;
 import net.minestom.server.entity.Player;
 import net.minestom.server.instance.block.Block;
@@ -41,11 +40,6 @@ public class SharedInstance extends Instance {
     }
 
     @Override
-    protected void cacheChunk(@NotNull Chunk chunk) {
-        instanceContainer.cacheChunk(chunk);
-    }
-
-    @Override
     public @NotNull CompletableFuture<Chunk> loadChunk(int chunkX, int chunkZ) {
         return instanceContainer.loadChunk(chunkX, chunkZ);
     }
@@ -61,8 +55,8 @@ public class SharedInstance extends Instance {
     }
 
     @Override
-    public @Nullable Chunk getChunk(int chunkX, int chunkZ, @NotNull ChunkStatus status) {
-        return instanceContainer.getChunk(chunkX, chunkZ, status);
+    public Chunk getChunk(int chunkX, int chunkZ) {
+        return instanceContainer.getChunk(chunkX, chunkZ);
     }
 
     @Override

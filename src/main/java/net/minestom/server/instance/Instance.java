@@ -21,11 +21,7 @@ import net.minestom.server.event.instance.InstanceTickEvent;
 import net.minestom.server.event.trait.InstanceEvent;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.instance.block.BlockHandler;
-<<<<<<< HEAD
 import net.minestom.server.instance.generator.Generator;
-=======
-import net.minestom.server.instance.light.InstanceLightManager;
->>>>>>> 3cbfe6be920cfd7a1fd681432658c5b3486bd51a
 import net.minestom.server.network.packet.server.play.BlockActionPacket;
 import net.minestom.server.network.packet.server.play.TimeUpdatePacket;
 import net.minestom.server.snapshot.*;
@@ -106,9 +102,6 @@ public abstract class Instance implements Block.Getter, Block.Setter,
     // Adventure
     private final Pointers pointers;
 
-    private InstanceLightManager lightManager;
-    private Duration lightUpdate = TimeUnit.SERVER_TICK.getDuration();
-
     /**
      * Creates a new instance.
      *
@@ -158,13 +151,6 @@ public abstract class Instance implements Block.Getter, Block.Setter,
      */
     @ApiStatus.Internal
     public abstract boolean breakBlock(@NotNull Player player, @NotNull Point blockPosition);
-
-    protected abstract void cacheChunk(@NotNull Chunk chunk);
-
-    protected final void registerChunk(@NotNull Chunk chunk) {
-        cacheChunk(chunk);
-        MinecraftServer.process().dispatcher().createPartition(chunk);
-    }
 
     /**
      * Forces the generation of a {@link Chunk}, even if no file and {@link ChunkGenerator} are defined.
@@ -235,11 +221,7 @@ public abstract class Instance implements Block.Getter, Block.Setter,
      * @param chunkZ the chunk Z
      * @return the chunk at the specified position, null if not loaded
      */
-    public @Nullable Chunk getChunk(int chunkX, int chunkZ) {
-        return getChunk(chunkX, chunkZ, ChunkStatus.COMPLETE);
-    }
-
-    public abstract @Nullable Chunk getChunk(int chunkX, int chunkZ, @NotNull ChunkStatus minStatus);
+    public abstract @Nullable Chunk getChunk(int chunkX, int chunkZ);
 
     /**
      * @param chunkX the chunk X
@@ -726,25 +708,5 @@ public abstract class Instance implements Block.Getter, Block.Setter,
     @Override
     public @NotNull Pointers pointers() {
         return this.pointers;
-    }
-
-    public final void setupLightManager(final boolean enableSkyLight, final boolean enableBlockLight) {
-        this.lightManager = new InstanceLightManager(this, enableSkyLight, enableBlockLight);
-    }
-
-    public final @Nullable InstanceLightManager getLightManager() {
-        return this.lightManager;
-    }
-
-    public final void setLightUpdate(@NotNull Duration lightUpdate) {
-        this.lightUpdate = lightUpdate;
-    }
-
-    final @NotNull Duration getLightUpdate() {
-        return this.lightUpdate;
-    }
-
-    public void onLightUpdate(final int chunkX, final int chunkZ, final int sectionIndex, final boolean skyLight) {
-
     }
 }
